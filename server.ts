@@ -197,6 +197,7 @@ app.post("/api/enhance", async (req, res) => {
 });
 
 async function setupVite() {
+  if (process.env.VERCEL) return;
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
