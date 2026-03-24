@@ -1,6 +1,6 @@
 
-import { generateSpeech } from './elevenLabsService';
-import { MusicCategory, VoiceId } from '../types';
+import { generateSpeech } from './elevenLabsService.js';
+import { MusicCategory, VoiceId } from '../types.js';
 
 const RADIO_INTRO_PATH = '/audio/06-Pingel.wav';
 

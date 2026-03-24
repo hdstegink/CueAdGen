@@ -1,7 +1,7 @@
 
 import OpenAI from "openai";
-import { BrandPassport, RagExample, UserInput, RadioScript } from '../types';
-import { RAG_DATASET } from '../constants';
+import { BrandPassport, RagExample, UserInput, RadioScript } from '../types.js';
+import { RAG_DATASET } from '../constants.js';
 
 /**
  * Hulpfunctie voor exponentiële backoff bij API-fouten

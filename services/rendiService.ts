@@ -1,5 +1,5 @@
 
-import { SpotAssets } from './audioProductionService';
+import { SpotAssets } from './audioProductionService.js';
 
 export interface SpotPlayer {
   play: () => void;
