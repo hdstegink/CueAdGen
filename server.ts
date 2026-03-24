@@ -185,6 +185,43 @@ app.delete("/api/templates/:id", async (req, res) => {
   }
 });
 
+// TTS Proxy — keeps ElevenLabs API key server-side
+app.post("/api/tts", async (req, res) => {
+  try {
+    const { text, voiceId, modelId, voiceSettings } = req.body;
+    if (!text || !voiceId) {
+      return res.status(400).json({ error: 'Missing text or voiceId' });
+    }
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'ELEVENLABS_API_KEY not configured' });
+    }
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: modelId || 'eleven_multilingual_v2',
+        voice_settings: voiceSettings || { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('[TTS Proxy] ElevenLabs error:', response.status, errorData);
+      return res.status(response.status).json({ error: 'ElevenLabs API error', details: errorData });
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    console.error('TTS proxy error:', error.message || error);
+    res.status(500).json({ error: 'TTS generation failed', details: error.message });
+  }
+});
+
 // AI Enhance Briefing
 app.post("/api/enhance", async (req, res) => {
   try {

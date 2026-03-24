@@ -1,7 +1,6 @@
 
-import { VoiceId } from '../types';
+import { VoiceId } from '../types.js';
 
-const API_KEY = process.env.ELEVENLABS_API_KEY || '';
 
 /**
  * Stem configuratie mapping naar ElevenLabs IDs
@@ -75,21 +74,19 @@ export const generateSpeech = async (
   }
 
   try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elevenId}`, {
+    const response = await fetch('/api/tts', {
       method: 'POST',
-      headers: {
-        'xi-api-key': API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: processedText,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: { ...settings, use_speaker_boost: true }
+        voiceId: elevenId,
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: { ...settings, use_speaker_boost: true },
       }),
     });
 
     
-    if (!response.ok) throw new Error("Fout bij ElevenLabs");
+    if (!response.ok) throw new Error("Fout bij spraakgeneratie");
     return await response.blob();
   } catch (e: any) {
     console.error(`[ElevenLabs] Error:`, e.message);
