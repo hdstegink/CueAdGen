@@ -185,6 +185,46 @@ app.delete("/api/templates/:id", async (req, res) => {
   }
 });
 
+// Email Proxy — keeps Postmark API key server-side
+app.post("/api/email", async (req, res) => {
+  try {
+    const { to, subject, htmlBody, bcc } = req.body;
+    if (!to || !subject || !htmlBody) {
+      return res.status(400).json({ error: 'Missing to, subject, or htmlBody' });
+    }
+    const apiKey = process.env.POSTMARK_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'POSTMARK_API_KEY not configured' });
+    }
+    const response = await fetch('https://api.postmarkapp.com/email', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Postmark-Server-Token': apiKey,
+      },
+      body: JSON.stringify({
+        From: 'almer@sokkenmakers.nl',
+        To: to,
+        Bcc: bcc || undefined,
+        Subject: subject,
+        HtmlBody: htmlBody,
+        MessageStream: 'broadcast',
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Postmark Error]', errorData);
+      return res.status(response.status).json({ error: errorData.Message || 'Postmark error', details: errorData });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (error: any) {
+    console.error('Email proxy error:', error.message || error);
+    res.status(500).json({ error: 'Email sending failed', details: error.message });
+  }
+});
+
 // TTS Proxy — keeps ElevenLabs API key server-side
 app.post("/api/tts", async (req, res) => {
   try {
