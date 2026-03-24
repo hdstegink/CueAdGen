@@ -20,7 +20,7 @@ const fetchWithRetry = async (fn: () => Promise<any>, retries = 2, delay = 1000)
   }
 };
 
-const getClient = () => new OpenAI({ apiKey: process.env.API_KEY, dangerouslyAllowBrowser: true });
+const getClient = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY || process.env.API_KEY });
 
 export const retrieveRelevantExamples = (passport: BrandPassport): RagExample[] => {
   const scoredExamples = RAG_DATASET.map(example => {
