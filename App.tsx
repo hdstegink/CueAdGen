@@ -2,11 +2,11 @@
 import { Key, AlertCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import PasswordGate from './components/PasswordGate';
+import { useAuthToken } from './components/PasswordGate';
 import InputForm from './components/InputForm';
 import AgentStatusDisplay from './components/AgentStatusDisplay';
 import ResultsDisplay from './components/ResultsDisplay';
 import { AgentStatus, BrandPassport, RadioScript, UserInput, SavedBriefing } from './types';
-import { runResearcherAgent, retrieveRelevantExamples, runCopywriterAgent } from './services/geminiService';
 import HistoryList from './components/HistoryList';
 import { History, Trash2, Clock } from 'lucide-react';
 
@@ -20,6 +20,7 @@ declare global {
 }
 
 const App: React.FC = () => {
+  const authToken = useAuthToken();
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.Idle);
   const [passport, setPassport] = useState<BrandPassport | null>(null);
   const [scripts, setScripts] = useState<RadioScript[]>([]);
@@ -29,13 +30,24 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<SavedBriefing[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Helper: authenticated fetch
+  const authFetch = (url: string, options: RequestInit = {}) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+  };
+
   useEffect(() => {
     fetchHistory();
   }, []);
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/briefings');
+      const res = await authFetch('/api/briefings');
       if (res.ok) {
         const data = await res.json();
         setHistory(data);
@@ -47,7 +59,7 @@ const App: React.FC = () => {
 
   const saveBriefing = async (id: string, input: UserInput, passport: BrandPassport, scripts: RadioScript[]) => {
     try {
-      const res = await fetch('/api/briefings', {
+      const res = await authFetch('/api/briefings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, input_data: input, passport, scripts })
@@ -63,7 +75,7 @@ const App: React.FC = () => {
 
   const deleteBriefing = async (id: string) => {
     try {
-      await fetch(`/api/briefings/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/briefings/${id}`, { method: 'DELETE' });
       fetchHistory();
     } catch (err) {
       console.error("Failed to delete briefing:", err);
@@ -85,18 +97,35 @@ const App: React.FC = () => {
     setStatus(AgentStatus.Researching);
 
     try {
-      // Step 1: Agent 1 (Researcher)
-      const generatedPassport = await runResearcherAgent(input);
+      // Step 1: Agent 1 (Researcher) — server-side
+      const researcherRes = await authFetch('/api/researcher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (!researcherRes.ok) throw new Error((await researcherRes.json()).error || 'Researcher failed');
+      const generatedPassport: BrandPassport = await researcherRes.json();
       setPassport(generatedPassport);
       
-      // Step 2: RAG Retrieval
+      // Step 2: RAG Retrieval — server-side
       setStatus(AgentStatus.Retrieving);
-      await new Promise(r => setTimeout(r, 800)); 
-      const relevantExamples = retrieveRelevantExamples(generatedPassport);
+      const ragRes = await authFetch('/api/retrieve-examples', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generatedPassport),
+      });
+      if (!ragRes.ok) throw new Error((await ragRes.json()).error || 'RAG retrieval failed');
+      const relevantExamples = await ragRes.json();
 
-      // Step 3: Agent 2 (Copywriter)
+      // Step 3: Agent 2 (Copywriter) — server-side
       setStatus(AgentStatus.Writing);
-      const generatedScripts = await runCopywriterAgent(input, generatedPassport, relevantExamples);
+      const copywriterRes = await authFetch('/api/copywriter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, passport: generatedPassport, examples: relevantExamples }),
+      });
+      if (!copywriterRes.ok) throw new Error((await copywriterRes.json()).error || 'Copywriter failed');
+      const generatedScripts: RadioScript[] = await copywriterRes.json();
       setScripts(generatedScripts);
 
       setStatus(AgentStatus.Completed);
@@ -122,14 +151,29 @@ const App: React.FC = () => {
     setStatus(AgentStatus.Writing);
 
     try {
-      const relevantExamples = retrieveRelevantExamples(updatedPassport);
-      const generatedScripts = await runCopywriterAgent(lastInput, updatedPassport, relevantExamples);
+      // RAG retrieval — server-side
+      const ragRes = await authFetch('/api/retrieve-examples', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPassport),
+      });
+      if (!ragRes.ok) throw new Error((await ragRes.json()).error || 'RAG retrieval failed');
+      const relevantExamples = await ragRes.json();
+
+      // Copywriter — server-side
+      const copywriterRes = await authFetch('/api/copywriter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: lastInput, passport: updatedPassport, examples: relevantExamples }),
+      });
+      if (!copywriterRes.ok) throw new Error((await copywriterRes.json()).error || 'Copywriter failed');
+      const generatedScripts: RadioScript[] = await copywriterRes.json();
       setScripts(generatedScripts);
       setStatus(AgentStatus.Completed);
       
       // Update in local DB
       if (lastInput) {
-        const id = Date.now().toString(); // Or keep original ID if we tracked it
+        const id = Date.now().toString();
         saveBriefing(id, lastInput, updatedPassport, generatedScripts);
       }
     } catch (err: any) {

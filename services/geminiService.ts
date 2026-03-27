@@ -20,10 +20,8 @@ const fetchWithRetry = async (fn: () => Promise<any>, retries = 2, delay = 1000)
   }
 };
 
-const isBrowser = typeof window !== 'undefined';
 const getClient = () => new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.API_KEY,
-  dangerouslyAllowBrowser: isBrowser,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export const retrieveRelevantExamples = (passport: BrandPassport): RagExample[] => {

@@ -56,7 +56,8 @@ export const produceRadioSpot = async (
     scriptContent: string, 
     voiceId: VoiceId, 
     musicCategory: MusicCategory,
-    toneOfVoice: string = ""
+    toneOfVoice: string = "",
+    authToken?: string | null
 ): Promise<SpotAssets> => {
   const normalizedCategory = (musicCategory || 'Regular').toLowerCase().trim();
   const musicPath = MUSIC_BEDS[normalizedCategory] || MUSIC_BEDS["regular"];
@@ -69,7 +70,7 @@ export const produceRadioSpot = async (
   // Parallel: fetch music bed + generate speech (pingel overgeslagen)
   const [musicBlobUrl, speechBlob] = await Promise.all([
     fetchAsBlobUrl(musicPath, `Muziekbedje: ${normalizedCategory}`),
-    generateSpeech(cleanText, voiceId, toneOfVoice)
+    generateSpeech(cleanText, voiceId, toneOfVoice, authToken)
   ]);
 
   const speechBlobUrl = URL.createObjectURL(speechBlob);

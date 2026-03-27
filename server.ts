@@ -3,8 +3,9 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
+import crypto from "crypto";
 import { supabase } from "./services/supabaseClient.js";
-import { enhanceBriefing } from "./services/geminiService.js";
+import { enhanceBriefing, runResearcherAgent, retrieveRelevantExamples, runCopywriterAgent } from "./services/geminiService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,8 +13,78 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(cors());
-app.use(express.json());
+// --- Session store ---
+const activeSessions = new Set<string>();
+
+// --- Security: Helmet-style headers ---
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
+// --- Security: Restrict CORS ---
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : [`http://localhost:${PORT}`];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '1mb' }));
+
+// --- Security: Rate limiting (in-memory, per IP) ---
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX = 100;
+
+function rateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return next();
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return res.status(429).json({ error: 'Te veel verzoeken. Probeer het later opnieuw.' });
+  }
+  next();
+}
+
+// Clean up rate limit map periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetTime) rateLimitMap.delete(ip);
+  }
+}, 5 * 60 * 1000);
+
+app.use('/api/', rateLimit);
+
+// --- Auth middleware ---
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token || !activeSessions.has(token)) {
+    return res.status(401).json({ error: 'Niet geautoriseerd. Log opnieuw in.' });
+  }
+  next();
+}
 
 // Serve audio files explicitly (before Vite middleware)
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), {
@@ -23,28 +94,31 @@ app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), {
   }
 }));
 
-// Password Verification Route
+// Password Verification Route (public — no auth required)
 app.post("/api/verify-password", (req, res) => {
   const { password } = req.body;
   const correctPassword = process.env.APP_PASSWORD;
   const guestPassword = process.env.APP_PASSWORD_GUEST;
   
   if (!correctPassword) {
-    // If no password is set in .env, allow access (or you could deny it)
-    return res.json({ success: true });
+    const token = crypto.randomUUID();
+    activeSessions.add(token);
+    return res.json({ success: true, token });
   }
 
   const validPasswords = [correctPassword, guestPassword].filter(Boolean);
   
   if (validPasswords.includes(password)) {
-    res.json({ success: true });
+    const token = crypto.randomUUID();
+    activeSessions.add(token);
+    res.json({ success: true, token });
   } else {
     res.status(401).json({ success: false, message: "Onjuist wachtwoord" });
   }
 });
 
-// API Routes
-app.get("/api/briefings", async (req, res) => {
+// API Routes — all require auth
+app.get("/api/briefings", requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("briefings")
@@ -73,11 +147,11 @@ app.get("/api/briefings", async (req, res) => {
     })));
   } catch (error: any) {
     console.error("Error fetching briefings:", error.message || error);
-    res.status(500).json({ error: "Failed to fetch briefings", details: error.message });
+    res.status(500).json({ error: "Failed to fetch briefings" });
   }
 });
 
-app.post("/api/briefings", async (req, res) => {
+app.post("/api/briefings", requireAuth, async (req, res) => {
   const { id, input_data, passport, scripts } = req.body;
   try {
     const { error } = await supabase
@@ -97,11 +171,11 @@ app.post("/api/briefings", async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("Error saving briefing:", error.message || error);
-    res.status(500).json({ error: "Failed to save briefing", details: error.message });
+    res.status(500).json({ error: "Failed to save briefing" });
   }
 });
 
-app.delete("/api/briefings/:id", async (req, res) => {
+app.delete("/api/briefings/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const { error } = await supabase
@@ -116,12 +190,12 @@ app.delete("/api/briefings/:id", async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting briefing:", error.message || error);
-    res.status(500).json({ error: "Failed to delete briefing", details: error.message });
+    res.status(500).json({ error: "Failed to delete briefing" });
   }
 });
 
 // Templates Routes
-app.get("/api/templates", async (req, res) => {
+app.get("/api/templates", requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("templates")
@@ -144,11 +218,11 @@ app.get("/api/templates", async (req, res) => {
     res.json(data);
   } catch (error: any) {
     console.error("Error fetching templates:", error.message || error);
-    res.status(500).json({ error: "Failed to fetch templates", details: error.message });
+    res.status(500).json({ error: "Failed to fetch templates" });
   }
 });
 
-app.post("/api/templates", async (req, res) => {
+app.post("/api/templates", requireAuth, async (req, res) => {
   const { id, label, data } = req.body;
   try {
     const { error } = await supabase
@@ -162,11 +236,11 @@ app.post("/api/templates", async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("Error saving template:", error.message || error);
-    res.status(500).json({ error: "Failed to save template", details: error.message });
+    res.status(500).json({ error: "Failed to save template" });
   }
 });
 
-app.delete("/api/templates/:id", async (req, res) => {
+app.delete("/api/templates/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const { error } = await supabase
@@ -181,12 +255,12 @@ app.delete("/api/templates/:id", async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting template:", error.message || error);
-    res.status(500).json({ error: "Failed to delete template", details: error.message });
+    res.status(500).json({ error: "Failed to delete template" });
   }
 });
 
 // Email Proxy — keeps Postmark API key server-side
-app.post("/api/email", async (req, res) => {
+app.post("/api/email", requireAuth, async (req, res) => {
   try {
     const { to, subject, htmlBody, bcc } = req.body;
     if (!to || !subject || !htmlBody) {
@@ -221,12 +295,12 @@ app.post("/api/email", async (req, res) => {
     res.json(data);
   } catch (error: any) {
     console.error('Email proxy error:', error.message || error);
-    res.status(500).json({ error: 'Email sending failed', details: error.message });
+    res.status(500).json({ error: 'Email sending failed' });
   }
 });
 
 // TTS Proxy — keeps ElevenLabs API key server-side
-app.post("/api/tts", async (req, res) => {
+app.post("/api/tts", requireAuth, async (req, res) => {
   try {
     const { text, voiceId, modelId, voiceSettings } = req.body;
     if (!text || !voiceId) {
@@ -258,18 +332,52 @@ app.post("/api/tts", async (req, res) => {
     res.send(Buffer.from(arrayBuffer));
   } catch (error: any) {
     console.error('TTS proxy error:', error.message || error);
-    res.status(500).json({ error: 'TTS generation failed', details: error.message });
+    res.status(500).json({ error: 'TTS generation failed' });
   }
 });
 
 // AI Enhance Briefing
-app.post("/api/enhance", async (req, res) => {
+app.post("/api/enhance", requireAuth, async (req, res) => {
   try {
     const improved = await enhanceBriefing(req.body);
     res.json(improved);
   } catch (error: any) {
     console.error("Error enhancing briefing:", error.message || error);
-    res.status(500).json({ error: "Failed to enhance briefing", details: error.message });
+    res.status(500).json({ error: "Failed to enhance briefing" });
+  }
+});
+
+// AI Researcher Agent — runs server-side, no key exposed to client
+app.post("/api/researcher", requireAuth, async (req, res) => {
+  try {
+    const passport = await runResearcherAgent(req.body);
+    res.json(passport);
+  } catch (error: any) {
+    console.error("Error in researcher agent:", error.message || error);
+    res.status(500).json({ error: "Researcher agent failed" });
+  }
+});
+
+// AI Copywriter Agent — runs server-side, no key exposed to client
+app.post("/api/copywriter", requireAuth, async (req, res) => {
+  try {
+    const { input, passport, examples } = req.body;
+    const scripts = await runCopywriterAgent(input, passport, examples);
+    res.json(scripts);
+  } catch (error: any) {
+    console.error("Error in copywriter agent:", error.message || error);
+    res.status(500).json({ error: "Copywriter agent failed" });
+  }
+});
+
+// RAG retrieval (lightweight, but still auth-protected)
+app.post("/api/retrieve-examples", requireAuth, (req, res) => {
+  try {
+    const examples = retrieveRelevantExamples(req.body);
+    res.json(examples);
+  } catch (error: any) {
+    console.error("Error retrieving examples:", error.message || error);
+    res.status(500).json({ error: "Failed to retrieve examples" });
   }
 });
 

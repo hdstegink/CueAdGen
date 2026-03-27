@@ -37,7 +37,8 @@ const getSettingsForTone = (tone: string = "", gender: 'Male' | 'Female' = 'Male
 export const generateSpeech = async (
   text: string, 
   voiceId: VoiceId, 
-  tone: string = ""
+  tone: string = "",
+  authToken?: string | null
 ) => {
   const elevenId = VOICE_MAPPING[voiceId];
   const gender = (voiceId === 'emma' || voiceId === 'marjan') ? 'Female' : 'Male';
@@ -76,7 +77,10 @@ export const generateSpeech = async (
   try {
     const response = await fetch('/api/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+      },
       body: JSON.stringify({
         text: processedText,
         voiceId: elevenId,

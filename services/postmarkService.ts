@@ -8,10 +8,13 @@ export interface EmailPayload {
   bcc?: string;
 }
 
-export const sendPostmarkEmail = async ({ to, subject, htmlBody, bcc }: EmailPayload): Promise<void> => {
+export const sendPostmarkEmail = async ({ to, subject, htmlBody, bcc }: EmailPayload, authToken?: string | null): Promise<void> => {
   const response = await fetch('/api/email', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+    },
     body: JSON.stringify({ to, subject, htmlBody, bcc }),
   });
 

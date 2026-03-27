@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Duration, UserInput } from '../types';
 import { ArrowRight, Beaker, Bookmark, ChevronDown, Zap, Sparkles, Globe, Building2, Users, Calendar, Target, Info, MessageSquare, Volume2, Save, Trash2, X, Check, Wand2 } from 'lucide-react';
 import { ACCOUNT_MANAGERS } from '../constants';
+import { useAuthToken } from './PasswordGate';
 
 interface Props {
   onSubmit: (data: UserInput) => void;
@@ -63,6 +64,18 @@ const TEST_CASES: (UserInput & { id: string, label: string })[] = [
 ];
 
 const InputForm: React.FC<Props> = ({ onSubmit, isProcessing }) => {
+  const authToken = useAuthToken();
+
+  const authFetch = (url: string, options: RequestInit = {}) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+  };
+
   const [formData, setFormData] = useState<UserInput & { preferredModel?: 'pro' | 'flash' }>({
     url: '',
     clientName: '',
@@ -106,7 +119,7 @@ const InputForm: React.FC<Props> = ({ onSubmit, isProcessing }) => {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch('/api/templates');
+      const res = await authFetch('/api/templates');
       if (res.ok) {
         const data = await res.json();
         setCustomCases(data.map((item: any) => {
@@ -138,7 +151,7 @@ const InputForm: React.FC<Props> = ({ onSubmit, isProcessing }) => {
     const managerLabel = formData.accountManager ? `[${formData.accountManager}]` : "[Eigen]";
 
     try {
-      const res = await fetch('/api/templates', {
+      const res = await authFetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -164,7 +177,7 @@ const InputForm: React.FC<Props> = ({ onSubmit, isProcessing }) => {
     e.stopPropagation();
     e.preventDefault();
     try {
-      const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/templates/${id}`, { method: 'DELETE' });
       if (res.ok) {
         fetchTemplates();
       }
@@ -483,7 +496,7 @@ const InputForm: React.FC<Props> = ({ onSubmit, isProcessing }) => {
                   onClick={async () => {
                     setIsEnhancing(true);
                     try {
-                      const res = await fetch('/api/enhance', {
+                      const res = await authFetch('/api/enhance', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(formData),

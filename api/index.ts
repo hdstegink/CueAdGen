@@ -7,9 +7,7 @@ export default async (req: any, res: any) => {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ 
-      error: 'Server module failed to load',
-      message: error.message,
-      stack: error.stack?.split('\n').slice(0, 5)
+      error: 'Server module failed to load'
     }));
   }
 };

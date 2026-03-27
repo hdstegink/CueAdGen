@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Lock, ArrowRight, ShieldAlert } from 'lucide-react';
+
+// Auth context to share the session token with the rest of the app
+const AuthContext = createContext<string | null>(null);
+export const useAuthToken = () => useContext(AuthContext);
 
 interface PasswordGateProps {
   children: React.ReactNode;
@@ -8,13 +12,27 @@ interface PasswordGateProps {
 const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem('app_authenticated');
-    if (savedAuth === 'true') {
-      setIsAuthenticated(true);
+    const savedToken = sessionStorage.getItem('app_auth_token');
+    if (savedToken) {
+      // Verify the token is still valid
+      fetch('/api/briefings', {
+        headers: { 'Authorization': `Bearer ${savedToken}` }
+      }).then(res => {
+        if (res.ok || res.status !== 401) {
+          setAuthToken(savedToken);
+          setIsAuthenticated(true);
+        } else {
+          sessionStorage.removeItem('app_auth_token');
+          setIsAuthenticated(false);
+        }
+      }).catch(() => {
+        setIsAuthenticated(false);
+      });
     } else {
       setIsAuthenticated(false);
     }
@@ -34,9 +52,10 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.token) {
         setIsAuthenticated(true);
-        localStorage.setItem('app_authenticated', 'true');
+        setAuthToken(data.token);
+        sessionStorage.setItem('app_auth_token', data.token);
       } else {
         setError(data.message || 'Onjuist wachtwoord');
       }
@@ -49,8 +68,8 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
 
   if (isAuthenticated === null) return null;
 
-  if (isAuthenticated) {
-    return <>{children}</>;
+  if (isAuthenticated && authToken) {
+    return <AuthContext.Provider value={authToken}>{children}</AuthContext.Provider>;
   }
 
   return (

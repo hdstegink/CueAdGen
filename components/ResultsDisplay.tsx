@@ -6,6 +6,7 @@ import { produceRadioSpot, SpotAssets } from '../services/audioProductionService
 import { createSpotPlayer, SpotPlayer } from '../services/rendiService';
 import { sendPostmarkEmail } from '../services/postmarkService';
 import { ACCOUNT_MANAGERS } from '../constants';
+import { useAuthToken } from './PasswordGate';
 
 interface Props {
   passport: BrandPassport;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset, onRegenerate }) => {
+  const authToken = useAuthToken();
   const [editedPassport, setEditedPassport] = useState<BrandPassport>(passport);
   const [isDirty, setIsDirty] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -125,7 +127,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
       try {
           setLoadingIndices(prev => new Set(prev).add(index));
           const script = scripts[index];
-          spotAssets = await produceRadioSpot(content, voiceId, script.musicCategory, editedPassport.toneOfVoice);
+          spotAssets = await produceRadioSpot(content, voiceId, script.musicCategory, editedPassport.toneOfVoice, authToken);
           setAudioCache(prev => ({ ...prev, [index]: spotAssets! }));
       } catch (err) {
           console.error("Audio generation failed", err);
@@ -207,7 +209,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
             bcc: 'hidde.stegink@persgroep.net', // BCC Hidde for testing/verification
             subject: `[DPG Radio: AdGen] Scripts: ${inputData.clientName} (${scripts.length} opties)`,
             htmlBody
-        });
+        }, authToken);
 
         setIsMailed(true);
     } catch (err: any) {
