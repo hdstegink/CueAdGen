@@ -20,6 +20,14 @@ declare global {
 }
 
 const App: React.FC = () => {
+  return (
+    <PasswordGate>
+      <AppContent />
+    </PasswordGate>
+  );
+};
+
+const AppContent: React.FC = () => {
   const authToken = useAuthToken();
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.Idle);
   const [passport, setPassport] = useState<BrandPassport | null>(null);
@@ -204,7 +212,6 @@ const App: React.FC = () => {
   };
 
   return (
-    <PasswordGate>
       <div className="min-h-screen flex flex-col relative overflow-x-hidden selection:bg-[#783C96] selection:text-white">
         <div className="fixed inset-0 -z-10 bg-gray-50">
           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#783C96]/15 rounded-full blur-[100px]" />
@@ -338,7 +345,6 @@ const App: React.FC = () => {
           </div>
         </footer>
       </div>
-    </PasswordGate>
   );
 };
 
