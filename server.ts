@@ -14,7 +14,11 @@ const app = express();
 const PORT = 3000;
 
 // --- Signed token auth (stateless, works on serverless) ---
-const TOKEN_SECRET = process.env.APP_PASSWORD || crypto.randomUUID();
+// Use a stable secret — must be the same across all serverless invocations
+const TOKEN_SECRET = process.env.APP_PASSWORD || process.env.SUPABASE_KEY || process.env.OPENAI_API_KEY || 'fallback-replace-me';
+if (TOKEN_SECRET === 'fallback-replace-me') {
+  console.warn('[Auth] WARNING: No stable env var found for TOKEN_SECRET. Set APP_PASSWORD in environment.');
+}
 
 function signToken(): string {
   const payload = Buffer.from(JSON.stringify({ iat: Date.now() })).toString('base64url');
