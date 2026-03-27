@@ -13,8 +13,29 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-// --- Session store ---
-const activeSessions = new Set<string>();
+// --- Signed token auth (stateless, works on serverless) ---
+const TOKEN_SECRET = process.env.APP_PASSWORD || crypto.randomUUID();
+
+function signToken(): string {
+  const payload = Buffer.from(JSON.stringify({ iat: Date.now() })).toString('base64url');
+  const signature = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyToken(token: string): boolean {
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [payload, signature] = parts;
+  const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
+  if (signature !== expected) return false;
+  // Check token age (max 24 hours)
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    return Date.now() - data.iat < 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
 
 // --- Security: Helmet-style headers ---
 app.use((_req, res, next) => {
@@ -29,11 +50,15 @@ app.use((_req, res, next) => {
 
 // --- Security: Restrict CORS ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [`http://localhost:${PORT}`];
+// On Vercel, also allow the deployment URL
+if (process.env.VERCEL_URL && !allowedOrigins.includes(`https://${process.env.VERCEL_URL}`)) {
+  allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (server-to-server, curl, etc.)
+    // Allow same-origin requests (no origin header) and whitelisted origins
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -80,7 +105,7 @@ app.use('/api/', rateLimit);
 // --- Auth middleware ---
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !activeSessions.has(token)) {
+  if (!token || !verifyToken(token)) {
     return res.status(401).json({ error: 'Niet geautoriseerd. Log opnieuw in.' });
   }
   next();
@@ -101,16 +126,14 @@ app.post("/api/verify-password", (req, res) => {
   const guestPassword = process.env.APP_PASSWORD_GUEST;
   
   if (!correctPassword) {
-    const token = crypto.randomUUID();
-    activeSessions.add(token);
+    const token = signToken();
     return res.json({ success: true, token });
   }
 
   const validPasswords = [correctPassword, guestPassword].filter(Boolean);
   
   if (validPasswords.includes(password)) {
-    const token = crypto.randomUUID();
-    activeSessions.add(token);
+    const token = signToken();
     res.json({ success: true, token });
   } else {
     res.status(401).json({ success: false, message: "Onjuist wachtwoord" });
