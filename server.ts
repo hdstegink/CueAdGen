@@ -52,9 +52,13 @@ app.use((_req, res, next) => {
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [`http://localhost:${PORT}`];
-// On Vercel, also allow the deployment URL
+// On Vercel, also allow the auto-generated deployment URLs
 if (process.env.VERCEL_URL && !allowedOrigins.includes(`https://${process.env.VERCEL_URL}`)) {
   allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
+if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+  const prodUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (!allowedOrigins.includes(prodUrl)) allowedOrigins.push(prodUrl);
 }
 app.use(cors({
   origin: (origin, callback) => {
@@ -62,7 +66,9 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Reject but don't crash — return false instead of Error
+      console.warn(`[CORS] Blocked origin: ${origin}`);
+      callback(null, false);
     }
   },
   credentials: true,
