@@ -19,26 +19,33 @@ const TOKEN_SECRET = process.env.APP_PASSWORD || process.env.SUPABASE_KEY || pro
 if (TOKEN_SECRET === 'fallback-replace-me') {
   console.warn('[Auth] WARNING: No stable env var found for TOKEN_SECRET. Set APP_PASSWORD in environment.');
 }
+console.log('[Auth] TOKEN_SECRET source:', process.env.APP_PASSWORD ? 'APP_PASSWORD' : process.env.SUPABASE_KEY ? 'SUPABASE_KEY' : 'other');
 
 function signToken(): string {
-  const payload = Buffer.from(JSON.stringify({ iat: Date.now() })).toString('base64url');
-  const signature = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
-  return `${payload}.${signature}`;
+  const timestamp = Date.now().toString(36);
+  const signature = crypto.createHmac('sha256', TOKEN_SECRET).update(timestamp).digest('hex');
+  return `${timestamp}.${signature}`;
 }
 
 function verifyToken(token: string): boolean {
-  const parts = token.split('.');
-  if (parts.length !== 2) return false;
-  const [payload, signature] = parts;
-  const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
-  if (signature !== expected) return false;
-  // Check token age (max 24 hours)
-  try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    return Date.now() - data.iat < 24 * 60 * 60 * 1000;
-  } catch {
+  if (!token) return false;
+  const dotIndex = token.indexOf('.');
+  if (dotIndex === -1) return false;
+  const timestamp = token.substring(0, dotIndex);
+  const signature = token.substring(dotIndex + 1);
+  // Verify signature
+  const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(timestamp).digest('hex');
+  if (signature !== expected) {
+    console.warn('[Auth] Token signature mismatch');
     return false;
   }
+  // Check token age (max 24 hours)
+  const iat = parseInt(timestamp, 36);
+  if (isNaN(iat) || Date.now() - iat > 24 * 60 * 60 * 1000) {
+    console.warn('[Auth] Token expired');
+    return false;
+  }
+  return true;
 }
 
 // --- Security: Helmet-style headers ---
@@ -114,7 +121,9 @@ app.use('/api/', rateLimit);
 
 // --- Auth middleware ---
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '');
+  console.log(`[Auth] ${req.method} ${req.path} - header: ${authHeader ? 'present' : 'missing'}, token: ${token ? token.substring(0, 10) + '...' : 'none'}`);
   if (!token || !verifyToken(token)) {
     return res.status(401).json({ error: 'Niet geautoriseerd. Log opnieuw in.' });
   }
