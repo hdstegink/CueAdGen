@@ -1,5 +1,5 @@
 {
-  "name": "CUE: AdGen - DPG Media",
+  "name": "Spot-On",
   "description": "An agentic AI tool for DPG Media (Qmusic/Joe) sales teams to generate radio scripts (10s/20s) based on client URLs and USPs using RAG.",
   "requestFramePermissions": []
 }

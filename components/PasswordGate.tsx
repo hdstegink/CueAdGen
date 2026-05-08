@@ -83,7 +83,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
           
           <h1 className="text-2xl font-black text-center text-black mb-2">Beveiligde Toegang</h1>
           <p className="text-gray-500 text-center text-sm mb-8 font-medium">
-            Voer het wachtwoord in om DPG Radio: AdGen te openen.
+            Voer het wachtwoord in om Spot-On te openen.
           </p>
 
           <form onSubmit={handleVerify} className="space-y-4">
@@ -122,7 +122,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
           
           <div className="mt-8 pt-6 border-t border-gray-50 text-center">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-              DPG Radio: AdGen
+              Spot-On
             </p>
           </div>
         </div>

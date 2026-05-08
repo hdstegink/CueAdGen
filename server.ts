@@ -62,7 +62,11 @@ app.use((_req, res, next) => {
 // --- Security: Restrict CORS ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [`http://localhost:${PORT}`];
+  : [];
+// Always allow localhost in development
+if (!allowedOrigins.includes(`http://localhost:${PORT}`)) {
+  allowedOrigins.push(`http://localhost:${PORT}`);
+}
 // On Vercel, also allow the auto-generated deployment URLs
 if (process.env.VERCEL_URL && !allowedOrigins.includes(`https://${process.env.VERCEL_URL}`)) {
   allowedOrigins.push(`https://${process.env.VERCEL_URL}`);

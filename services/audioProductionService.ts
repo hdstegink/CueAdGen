@@ -1,15 +1,44 @@
 
 import { generateSpeech } from './elevenLabsService.js';
-import { MusicCategory, VoiceId } from '../types.js';
+import { Duration, MusicCategory, VoiceId } from '../types.js';
 
 const RADIO_INTRO_PATH = '/audio/06-Pingel.wav';
 
-const MUSIC_BEDS: Record<string, string> = {
-  "calm": "/audio/01_CALM_SLEEPY.mp3",
-  "inspirational": "/audio/02_INSPIRATIONAL.mp3",
-  "regular": "/audio/03_REGULAR_HOLIDAY.mp3",
-  "happy": "/audio/04_HAPPY_KLEDING.mp3",
-  "stoer": "/audio/05_STOER_AUTO.mp3"
+/**
+ * Mapping van categorie → base filename per duur.
+ * Bestandsnamen komen exact overeen met public/audio/.
+ */
+const MUSIC_BEDS: Record<string, Record<string, string>> = {
+  "calm": {
+    "5s":  "/audio/01_CALM _SLEEPY_(05).mp3",
+    "10s": "/audio/01_CALM _SLEEPY_(10).mp3",
+    "15s": "/audio/01_CALM _SLEEPY_(15).mp3",
+    "20s": "/audio/01_CALM _SLEEPY_(20).mp3",
+  },
+  "inspirational": {
+    "5s":  "/audio/02_INSPIRATIONAL_(5).mp3",
+    "10s": "/audio/02_INSPIRATIONAL_(10).mp3",
+    "15s": "/audio/02_INSPIRATIONAL_(15).mp3",
+    "20s": "/audio/02_INSPIRATIONAL_(20).mp3",
+  },
+  "regular": {
+    "5s":  "/audio/03_REGULAR_HOLIDAY_(5).mp3",
+    "10s": "/audio/03_REGULAR_HOLIDAY_(10).mp3",
+    "15s": "/audio/03_REGULAR_HOLIDAY_(15).mp3",
+    "20s": "/audio/03_REGULAR_HOLIDAY_(20).mp3",
+  },
+  "happy": {
+    "5s":  "/audio/04_HAPPY_KLEDING_(5).mp3",
+    "10s": "/audio/04_HAPPY_KLEDING_(10).mp3",
+    "15s": "/audio/04_HAPPY_KLEDING_(15).mp3",
+    "20s": "/audio/04_HAPPY_KLEDING_(20).mp3",
+  },
+  "stoer": {
+    "5s":  "/audio/05 _STOER _AUTO_(5).mp3",
+    "10s": "/audio/05 _STOER _AUTO_(10).mp3",
+    "15s": "/audio/05 _STOER _AUTO_(15).mp3",
+    "20s": "/audio/05 _STOER _AUTO_(20).mp3",
+  },
 };
 
 const blobUrlCache: Record<string, string> = {};
@@ -56,11 +85,14 @@ export const produceRadioSpot = async (
     scriptContent: string, 
     voiceId: VoiceId, 
     musicCategory: MusicCategory,
+    duration: Duration,
     toneOfVoice: string = "",
     authToken?: string | null
 ): Promise<SpotAssets> => {
   const normalizedCategory = (musicCategory || 'Regular').toLowerCase().trim();
-  const musicPath = MUSIC_BEDS[normalizedCategory] || MUSIC_BEDS["regular"];
+  const categoryBeds = MUSIC_BEDS[normalizedCategory] || MUSIC_BEDS["regular"];
+  const musicPath = categoryBeds[duration] || categoryBeds["10s"];
+  console.log(`[RadioProduction] 🎵 Bed: ${normalizedCategory} @ ${duration} → ${musicPath}`);
 
   const cleanText = scriptContent
     .replace(/^(?:VO:|Voice-Over:)/i, '')

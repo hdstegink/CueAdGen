@@ -127,7 +127,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
       try {
           setLoadingIndices(prev => new Set(prev).add(index));
           const script = scripts[index];
-          spotAssets = await produceRadioSpot(content, voiceId, script.musicCategory, editedPassport.toneOfVoice, authToken);
+          spotAssets = await produceRadioSpot(content, voiceId, script.musicCategory, inputData.duration, editedPassport.toneOfVoice, authToken);
           setAudioCache(prev => ({ ...prev, [index]: spotAssets! }));
       } catch (err) {
           console.error("Audio generation failed", err);
@@ -185,7 +185,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
                 </div>
 
                 <p>Hoi ${am.name},</p>
-                <p>Ik heb met DPG Radio: AdGen een aantal radio scripts gegenereerd voor <strong>${inputData.clientName}</strong>. Hieronder vind je de drie voorgestelde richtingen.</p>
+                <p>Ik heb met Spot-On een aantal radio scripts gegenereerd voor <strong>${inputData.clientName}</strong>. Hieronder vind je de drie voorgestelde richtingen.</p>
                 
                 <div style="background: #f4f0f7; padding: 15px; border-radius: 8px; margin: 20px 0;">
                     <h4 style="color: #783C96; margin-top: 0; margin-bottom: 10px;">Brand DNA Context:</h4>
@@ -200,14 +200,14 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
                 
                 ${scriptsHtml}
                 
-                <p style="font-size: 12px; color: #999; text-align: center; margin-top: 40px;">Gegenereerd door DPG Radio: AdGen — DPG Media.</p>
+                <p style="font-size: 12px; color: #999; text-align: center; margin-top: 40px;">Gegenereerd door Spot-On — DPG Media.</p>
             </div>
         `;
 
         await sendPostmarkEmail({
             to: am.email,
             bcc: 'hidde.stegink@persgroep.net', // BCC Hidde for testing/verification
-            subject: `[DPG Radio: AdGen] Scripts: ${inputData.clientName} (${scripts.length} opties)`,
+            subject: `[Spot-On] Scripts: ${inputData.clientName} (${scripts.length} opties)`,
             htmlBody
         }, authToken);
 

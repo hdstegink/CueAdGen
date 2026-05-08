@@ -228,7 +228,7 @@ const AppContent: React.FC = () => {
                   <div className="w-2.5 bg-[#fabb22] h-5 rounded-t-sm"></div>
                </div>
                <div className="flex flex-col">
-                  <span className="text-2xl font-extrabold tracking-tight text-black leading-none">DPG Radio: AdGen</span>
+                  <span className="text-2xl font-extrabold tracking-tight text-black leading-none">Spot-On</span>
                   <span className="text-xs font-semibold text-[#783C96] tracking-wide">DPG Media</span>
                </div>
             </div>
