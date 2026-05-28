@@ -14,7 +14,9 @@ export const ACCOUNT_MANAGERS: AccountManager[] = [
   { name: "Kevin", email: "kevin.schmidt@persgroep.net" },
   { name: "Rutger", email: "rutger.praamstra@persgroep.net" },
   { name: "Gunar", email: "gunar.miltenburg@persgroep.net" },
-  { name: "Karel", email: "karel.scheerder@persgroep.net" }
+  { name: "Karel", email: "karel.scheerder@persgroep.net" },
+  { name: "Anne Marie", email: "annemarie.vink@dpgmedia.nl" },
+  { name: "Iris", email: "iris.schuphof@dpgmedia.nl" }
 ];
 
 export const RAG_DATASET: RagExample[] = [
