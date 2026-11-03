@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import { Copy, Music, Zap, Hash, Calendar, Megaphone, UserCircle, RefreshCw, Play, Square, Loader2, Mic, Mail, X, Send, Check, Volume2, ChevronDown, Info, ExternalLink } from 'lucide-react';
+import React, { useLayoutEffect, useState, useEffect, useRef } from 'react';
 import { BrandPassport, RadioScript, UserInput, MusicCategory, VOICES, VoiceId } from '../types';
-import { Copy, Music, Zap, Hash, Calendar, Megaphone, UserCircle, RefreshCw, Play, Square, Loader2, Mic, Mail, X, Send, Check, Volume2, ChevronDown, Info } from 'lucide-react';
 import { produceRadioSpot, SpotAssets } from '../services/audioProductionService';
 import { createSpotPlayer, SpotPlayer } from '../services/rendiService';
 import { sendPostmarkEmail } from '../services/postmarkService';
@@ -15,6 +14,43 @@ interface Props {
   onReset: () => void;
   onRegenerate: (updatedPassport: BrandPassport) => void;
 }
+
+interface AutoResizeTextareaProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  rows?: number;
+  className: string;
+  spellCheck?: boolean;
+}
+
+const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({
+  value,
+  onValueChange,
+  rows = 1,
+  className,
+  spellCheck,
+}) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [value, rows]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      rows={rows}
+      value={value}
+      onChange={event => onValueChange(event.target.value)}
+      className={className}
+      spellCheck={spellCheck}
+      style={{ overflowY: 'hidden' }}
+    />
+  );
+};
 
 const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset, onRegenerate }) => {
   const authToken = useAuthToken();
@@ -88,21 +124,6 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
     });
   };
 
-  const calculatePlaybackRate = (musicCategory: MusicCategory, toneOfVoice: string) => {
-    const tone = toneOfVoice.toLowerCase();
-    const cat = musicCategory.toLowerCase();
-    
-    if (tone.includes('energiek') || tone.includes('luid') || tone.includes('krachtig') || tone.includes('enthousiast') || cat === 'happy' || cat === 'stoer') {
-      return 1.1;
-    }
-    
-    if (tone.includes('rustig') || tone.includes('kalm') || tone.includes('serieus') || cat === 'calm') {
-      return 1.0;
-    }
-
-    return 1.05;
-  };
-
   const handlePlayAudio = async (index: number, content: string) => {
     const voiceId = selectedVoices[index] || scripts[index]?.voiceId || inputData.voiceId || 'erik';
     
@@ -119,8 +140,6 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
     }
 
     if (!scripts[index]) return;
-
-    const speed = calculatePlaybackRate(scripts[index].musicCategory, editedPassport.toneOfVoice);
 
     let spotAssets = audioCache[index];
     if (!spotAssets) {
@@ -142,7 +161,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
       }
     }
 
-    const player = createSpotPlayer(spotAssets, speed);
+    const player = createSpotPlayer(spotAssets, 1.0);
     playerRef.current = player;
     setPlayingScriptIndex(index);
     player.onEnded(() => {
@@ -239,10 +258,10 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
-  const inputContainerClass = "bg-gray-50 p-4 rounded-xl border border-transparent focus-within:ring-2 focus-within:ring-[#783C96]/20 focus-within:border-[#783C96] transition-all flex flex-col group cursor-text";
+  const inputContainerClass = "min-w-0 bg-gray-50 p-4 rounded-xl border border-transparent focus-within:ring-2 focus-within:ring-[#783C96]/20 focus-within:border-[#783C96] transition-all flex flex-col group cursor-text";
   const labelClass = "text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5 group-focus-within:text-[#783C96] transition-colors";
-  const inputClass = "w-full bg-transparent border-none outline-none text-sm font-bold text-gray-900 placeholder:text-gray-400 p-0";
-  const textAreaClass = "w-full bg-transparent border-none outline-none text-sm font-bold text-gray-900 leading-relaxed resize-none placeholder:text-gray-400 p-0";
+  const inputClass = "w-full min-w-0 bg-transparent border-none outline-none text-sm font-bold text-gray-900 placeholder:text-gray-400 p-0";
+  const textAreaClass = "w-full min-w-0 bg-transparent border-none outline-none text-sm font-bold text-gray-900 leading-relaxed resize-y placeholder:text-gray-400 p-0";
 
   return (
     <div className="w-full grid grid-cols-1 xl:grid-cols-12 gap-8 relative">
@@ -255,19 +274,42 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
           </div>
           <div className="p-6 space-y-4">
             <div className="space-y-4">
+              {editedPassport.websiteResearch && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                  <p className={labelClass}>Websiteonderzoek</p>
+                  <p className="text-xs leading-relaxed text-gray-700">{editedPassport.websiteResearch}</p>
+                  {!!editedPassport.websiteSources?.length && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {editedPassport.websiteSources.map((source, index) => {
+                        try {
+                          const url = new URL(source);
+                          if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+                          return (
+                            <a key={source} href={url.href} target="_blank" rel="noreferrer" title="Open bron" className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#783C96] hover:underline">
+                              Bron {index + 1}<ExternalLink className="w-3 h-3" />
+                            </a>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className={inputContainerClass}>
                 <label className={labelClass}><Volume2 className="w-3.5 h-3.5" /> Tone of Voice</label>
-                <input 
-                  type="text" 
-                  className={inputClass} 
-                  value={editedPassport.toneOfVoice} 
-                  onChange={(e) => handleInputChange('toneOfVoice', e.target.value)} 
+                <AutoResizeTextarea
+                  rows={2}
+                  className={textAreaClass}
+                  value={editedPassport.toneOfVoice}
+                  onValueChange={value => handleInputChange('toneOfVoice', value)}
                 />
               </div>
-              <div className={inputContainerClass}><label className={labelClass}><Hash className="w-3.5 h-3.5" /> Kernwoorden</label><input type="text" className={inputClass} value={editedPassport.keywords.join(', ')} onChange={(e) => handleKeywordChange(e.target.value)} /></div>
-              <div className={inputContainerClass}><label className={labelClass}><Megaphone className="w-3.5 h-3.5" /> Pay-off</label><input type="text" className={inputClass} value={editedPassport.payoff} onChange={(e) => handleInputChange('payoff', e.target.value)} /></div>
-              <div className={inputContainerClass}><label className={labelClass}><UserCircle className="w-3.5 h-3.5" /> Doelgroep</label><textarea rows={3} className={textAreaClass} value={editedPassport.targetAudience} onChange={(e) => handleInputChange('targetAudience', e.target.value)} /></div>
-              <div className={inputContainerClass}><label className={labelClass}><Calendar className="w-3.5 h-3.5" /> Haakje</label><textarea rows={2} className={textAreaClass} value={editedPassport.seasonalHook} onChange={(e) => handleInputChange('seasonalHook', e.target.value)} /></div>
+              <div className={inputContainerClass}><label className={labelClass}><Hash className="w-3.5 h-3.5" /> Kernwoorden</label><AutoResizeTextarea rows={1} className={textAreaClass} value={editedPassport.keywords.join(', ')} onValueChange={handleKeywordChange} /></div>
+              <div className={inputContainerClass}><label className={labelClass}><Megaphone className="w-3.5 h-3.5" /> Pay-off</label><AutoResizeTextarea rows={1} className={textAreaClass} value={editedPassport.payoff} onValueChange={value => handleInputChange('payoff', value)} /></div>
+              <div className={inputContainerClass}><label className={labelClass}><UserCircle className="w-3.5 h-3.5" /> Doelgroep</label><AutoResizeTextarea rows={2} className={textAreaClass} value={editedPassport.targetAudience} onValueChange={value => handleInputChange('targetAudience', value)} /></div>
+              <div className={inputContainerClass}><label className={labelClass}><Calendar className="w-3.5 h-3.5" /> Haakje</label><AutoResizeTextarea rows={1} className={textAreaClass} value={editedPassport.seasonalHook} onValueChange={value => handleInputChange('seasonalHook', value)} /></div>
               <div className={inputContainerClass}>
                 <label className={labelClass}><Music className="w-3.5 h-3.5" /> Muziekstijl</label>
                 <select 
@@ -438,10 +480,11 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
                     <div className={`bg-gray-900 rounded-xl p-8 relative overflow-hidden group transition-all duration-500 ${isPlaying ? 'ring-4 ring-[#783C96]/30' : ''}`}>
                         {isPlaying && <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20"><div className="heartbeat-bar w-2 bg-white mx-1" style={{animationDelay: '0s'}}></div><div className="heartbeat-bar w-2 bg-white mx-1" style={{animationDelay: '0.2s'}}></div><div className="heartbeat-bar w-2 bg-white mx-1" style={{animationDelay: '0.4s'}}></div></div>}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        <textarea 
+                        <AutoResizeTextarea
+                          rows={4}
                             value={editedScripts[idx] ?? script.content}
-                            onChange={(e) => handleScriptChange(idx, e.target.value)}
                             className="w-full bg-transparent border-none outline-none font-mono text-lg text-white leading-loose whitespace-pre-wrap relative z-10 font-bold resize-none min-h-[200px] focus:ring-0 p-0"
+                          onValueChange={value => handleScriptChange(idx, value)}
                             spellCheck={false}
                         />
                     </div>

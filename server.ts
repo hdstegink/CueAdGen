@@ -12,6 +12,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
+let viteServer: import("vite").ViteDevServer | undefined;
+let httpServer: import("node:http").Server | undefined;
+let isShuttingDown = false;
 
 // --- Signed token auth (stateless, works on serverless) ---
 // Use a stable secret — must be the same across all serverless invocations
@@ -364,7 +367,7 @@ app.post("/api/tts", requireAuth, async (req, res) => {
       },
       body: JSON.stringify({
         text,
-        model_id: modelId || 'eleven_multilingual_v2',
+        model_id: modelId || 'eleven_v4',
         voice_settings: voiceSettings || { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
       }),
     });
@@ -419,7 +422,8 @@ app.post("/api/copywriter", requireAuth, async (req, res) => {
 // RAG retrieval (lightweight, but still auth-protected)
 app.post("/api/retrieve-examples", requireAuth, (req, res) => {
   try {
-    const examples = retrieveRelevantExamples(req.body);
+    const { input, passport } = req.body;
+    const examples = retrieveRelevantExamples(input, passport);
     res.json(examples);
   } catch (error: any) {
     console.error("Error retrieving examples:", error.message || error);
@@ -432,11 +436,11 @@ async function setupVite() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
+    viteServer = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
-    app.use(vite.middlewares);
+    app.use(viteServer.middlewares);
   } else if (!process.env.VERCEL) {
     // Only serve static files if NOT on Vercel (e.g. local production test)
     // Vercel handles static files via rewrites in vercel.json
@@ -448,12 +452,33 @@ async function setupVite() {
   }
 }
 
-setupVite();
+async function startServer() {
+  await setupVite();
+  if (isShuttingDown) return;
 
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+    httpServer = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
+
+async function shutdown() {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  const closeHttpServer = httpServer
+    ? new Promise<void>(resolve => httpServer!.close(() => resolve()))
+    : Promise.resolve();
+  await Promise.allSettled([closeHttpServer, viteServer?.close()]);
+  process.exit(0);
+}
+
+if (!process.env.VERCEL) {
+  process.once("SIGINT", () => void shutdown());
+  process.once("SIGTERM", () => void shutdown());
+}
+
+void startServer();
 
 export default app;

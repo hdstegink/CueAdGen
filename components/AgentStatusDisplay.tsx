@@ -1,17 +1,18 @@
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AgentStatus } from '../types';
 import { Search, Database, PenTool, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   status: AgentStatus;
+  message: string;
 }
 
-const AgentStatusDisplay: React.FC<Props> = ({ status }) => {
+const AgentStatusDisplay: React.FC<Props> = ({ status, message }) => {
   const steps = [
-    { id: AgentStatus.Researching, label: 'Agent 1: Researching Brand', icon: Search, color: '#783C96' },
-    { id: AgentStatus.Retrieving, label: 'RAG: Finding Best Practices', icon: Database, color: '#D23278' },
-    { id: AgentStatus.Writing, label: 'Agent 2: Copywriting', icon: PenTool, color: '#E6463C' },
+    { id: AgentStatus.Researching, label: 'Websiteonderzoek', icon: Search, color: '#783C96' },
+    { id: AgentStatus.Retrieving, label: 'Inspiratie selecteren', icon: Database, color: '#D23278' },
+    { id: AgentStatus.Writing, label: 'Scripts schrijven', icon: PenTool, color: '#E6463C' },
   ];
 
   const getCurrentStepIndex = () => {
@@ -25,6 +26,30 @@ const AgentStatusDisplay: React.FC<Props> = ({ status }) => {
   };
 
   const activeIndex = getCurrentStepIndex();
+  const currentMessage = useRef(message);
+  const [previousMessage, setPreviousMessage] = useState('');
+  const [visibleMessage, setVisibleMessage] = useState(message);
+  const [isRolling, setIsRolling] = useState(false);
+
+  useEffect(() => {
+    if (!message || message === currentMessage.current) return;
+    const previous = currentMessage.current;
+    currentMessage.current = message;
+    setVisibleMessage(message);
+    if (!previous) return;
+
+    setPreviousMessage(previous);
+    setIsRolling(false);
+    const frame = requestAnimationFrame(() => setIsRolling(true));
+    const resetTimer = setTimeout(() => {
+      setPreviousMessage('');
+      setIsRolling(false);
+    }, 500);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(resetTimer);
+    };
+  }, [message]);
 
   if (status === AgentStatus.Idle || status === AgentStatus.Error) return null;
 
@@ -78,6 +103,18 @@ const AgentStatusDisplay: React.FC<Props> = ({ status }) => {
           );
         })}
       </div>
+      {!!message && (
+        <div className="mt-14 flex justify-center px-4" role="status" aria-live="polite" aria-atomic="true">
+          <div className="h-6 max-w-full overflow-hidden text-center text-xs font-medium text-gray-500">
+            <div
+              className={`flex flex-col transition-transform duration-500 ease-out motion-reduce:transition-none ${isRolling ? '-translate-y-6' : 'translate-y-0'}`}
+            >
+              {previousMessage && <p className="flex h-6 shrink-0 items-center justify-center whitespace-nowrap px-2">{previousMessage}</p>}
+              <p className="flex h-6 shrink-0 items-center justify-center whitespace-nowrap px-2">{visibleMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

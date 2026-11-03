@@ -1,4 +1,3 @@
-
 import { Key, AlertCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import PasswordGate from './components/PasswordGate';
@@ -30,6 +29,7 @@ const App: React.FC = () => {
 const AppContent: React.FC = () => {
   const authToken = useAuthToken();
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.Idle);
+  const [progressMessage, setProgressMessage] = useState('');
   const [passport, setPassport] = useState<BrandPassport | null>(null);
   const [scripts, setScripts] = useState<RadioScript[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +103,7 @@ const AppContent: React.FC = () => {
     setIsQuotaError(false);
     setLastInput(input);
     setStatus(AgentStatus.Researching);
+    setProgressMessage('De officiële website onderzoeken op aanbod, doelgroep en merktoon');
 
     try {
       // Step 1: Agent 1 (Researcher) — server-side
@@ -114,19 +115,22 @@ const AppContent: React.FC = () => {
       if (!researcherRes.ok) throw new Error((await researcherRes.json()).error || 'Researcher failed');
       const generatedPassport: BrandPassport = await researcherRes.json();
       setPassport(generatedPassport);
+      setProgressMessage('Merkprofiel en gevonden bronnen verwerken');
       
       // Step 2: RAG Retrieval — server-side
       setStatus(AgentStatus.Retrieving);
+      setProgressMessage('Voorbeelden rangschikken op branche, merktoon en spotlengte');
       const ragRes = await authFetch('/api/retrieve-examples', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(generatedPassport),
+        body: JSON.stringify({ input, passport: generatedPassport }),
       });
       if (!ragRes.ok) throw new Error((await ragRes.json()).error || 'RAG retrieval failed');
       const relevantExamples = await ragRes.json();
 
       // Step 3: Agent 2 (Copywriter) — server-side
       setStatus(AgentStatus.Writing);
+      setProgressMessage('Drie verschillende scripts schrijven met de briefing en het onderzoek');
       const copywriterRes = await authFetch('/api/copywriter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,6 +138,7 @@ const AppContent: React.FC = () => {
       });
       if (!copywriterRes.ok) throw new Error((await copywriterRes.json()).error || 'Copywriter failed');
       const generatedScripts: RadioScript[] = await copywriterRes.json();
+      setProgressMessage('Scripts ontvangen en klaarmaken voor weergave');
       setScripts(generatedScripts);
 
       setStatus(AgentStatus.Completed);
@@ -156,19 +161,22 @@ const AppContent: React.FC = () => {
     setPassport(updatedPassport);
     setError(null);
     setIsQuotaError(false);
-    setStatus(AgentStatus.Writing);
+    setStatus(AgentStatus.Retrieving);
+    setProgressMessage('Nieuwe voorbeelden kiezen bij het aangepaste merkprofiel');
 
     try {
       // RAG retrieval — server-side
       const ragRes = await authFetch('/api/retrieve-examples', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedPassport),
+        body: JSON.stringify({ input: lastInput, passport: updatedPassport }),
       });
       if (!ragRes.ok) throw new Error((await ragRes.json()).error || 'RAG retrieval failed');
       const relevantExamples = await ragRes.json();
 
       // Copywriter — server-side
+      setStatus(AgentStatus.Writing);
+      setProgressMessage('De scripts herschrijven met je aangepaste merkprofiel');
       const copywriterRes = await authFetch('/api/copywriter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,6 +184,7 @@ const AppContent: React.FC = () => {
       });
       if (!copywriterRes.ok) throw new Error((await copywriterRes.json()).error || 'Copywriter failed');
       const generatedScripts: RadioScript[] = await copywriterRes.json();
+      setProgressMessage('Herschreven scripts klaarmaken voor weergave');
       setScripts(generatedScripts);
       setStatus(AgentStatus.Completed);
       
@@ -195,6 +204,7 @@ const AppContent: React.FC = () => {
 
   const handleReset = () => {
     setStatus(AgentStatus.Idle);
+    setProgressMessage('');
     setPassport(null);
     setScripts([]);
     setError(null);
@@ -322,7 +332,7 @@ const AppContent: React.FC = () => {
 
           {(status === AgentStatus.Researching || status === AgentStatus.Retrieving || status === AgentStatus.Writing) && (
              <div className="flex-grow flex flex-col items-center justify-center min-h-[50vh]">
-                <AgentStatusDisplay status={status} />
+                <AgentStatusDisplay status={status} message={progressMessage} />
              </div>
           )}
 

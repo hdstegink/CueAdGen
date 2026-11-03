@@ -8,21 +8,22 @@ export enum Duration {
 
 export type MusicCategory = "Calm" | "Inspirational" | "Regular" | "Happy" | "Stoer";
 
-export type VoiceId = "erik" | "samuel" | "emma" | "marjan" | "rolf";
+export type VoiceId = string;
 
 export interface Voice {
   id: VoiceId;
   name: string;
   description: string;
   gender: "Male" | "Female";
+  elevenLabsId: string;
 }
 
 export const VOICES: Voice[] = [
-  { id: "erik", name: "Erik", description: "Heel rustig en veilig", gender: "Male" },
-  { id: "samuel", name: "Samuel", description: "Fris en jong", gender: "Male" },
-  { id: "rolf", name: "Rolf", description: "Krachtige radiostem", gender: "Male" },
-  { id: "emma", name: "Emma", description: "Warm en zakelijk", gender: "Female" },
-  { id: "marjan", name: "Marjan", description: "Heldere vrouwenstem", gender: "Female" },
+  { id: "erik", name: "Erik", description: "Heel rustig en veilig", gender: "Male", elevenLabsId: "60CwgZt94Yf7yYIXMDDe" },
+  { id: "samuel", name: "Samuel", description: "Fris en jong", gender: "Male", elevenLabsId: "DUhjXXCXHQWckglMUnOv" },
+  { id: "rolf", name: "Rolf", description: "Krachtige radiostem", gender: "Male", elevenLabsId: "lyMhRNSScIYS9YRQitfK" },
+  { id: "emma", name: "Emma", description: "Warm en zakelijk", gender: "Female", elevenLabsId: "yO6w2xlECAQRFP6pX7Hw" },
+  { id: "marjan", name: "Marjan", description: "Heldere vrouwenstem", gender: "Female", elevenLabsId: "46eAUFOjYHnAbq9XpWMc" },
 ];
 
 export interface UserInput {
@@ -49,6 +50,8 @@ export interface BrandPassport {
   inferredIndustry: string;
   payoff: string;
   musicCategory: MusicCategory;
+  websiteResearch?: string;
+  websiteSources?: string[];
 }
 
 export interface RadioScript {

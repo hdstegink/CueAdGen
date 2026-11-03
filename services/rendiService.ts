@@ -61,8 +61,8 @@ const createAudioEl = (blobUrl: string, volume: number): Promise<HTMLAudioElemen
  * Speelt een radiospot af als multi-track sequence:
  * 1. Intro pingel
  * 2. 0.5s pauze
- * 3. Muziekbed + spraak tegelijk
- * 4. 1.5s na spraak einde → stop
+ * 3. Muziekbed start, daarna volgt de spraak na 0.5s
+ * 4. Stop zodra zowel muziekbed als spraak klaar zijn
  */
 export const createSpotPlayer = (assets: SpotAssets, playbackRate: number = 1.0): SpotPlayer => {
   let stopped = false;
@@ -111,20 +111,26 @@ export const createSpotPlayer = (assets: SpotAssets, playbackRate: number = 1.0)
 
       const startMainContent = () => {
         if (stopped) return;
-        console.log("[Rendi] ▶ Muziekbed + spraak");
+        console.log("[Rendi] ▶ Muziekbed");
         if (musicEl) musicEl.play().catch(e => console.warn("[Rendi] Music play:", e.message));
-        speechEl.play().catch(e => console.error("[Rendi] Speech play:", e.message));
 
-        speechEl.onended = () => {
+        const finishIfBothEnded = () => {
           if (stopped) return;
-          console.log("[Rendi] ✅ Spraak klaar");
-          const t = setTimeout(() => {
-            if (stopped) return;
-            cleanup();
-            if (endCb) endCb();
-          }, 1500);
-          timeouts.push(t);
+          if (!speechEl.ended || (musicEl && !musicEl.ended)) return;
+          console.log("[Rendi] ✅ Spot klaar");
+          cleanup();
+          if (endCb) endCb();
         };
+
+        speechEl.onended = finishIfBothEnded;
+        if (musicEl) musicEl.onended = finishIfBothEnded;
+
+        const speechStartTimeout = setTimeout(() => {
+          if (stopped) return;
+          console.log("[Rendi] ▶ Voice-over na 0.5s");
+          speechEl.play().catch(e => console.error("[Rendi] Speech play:", e.message));
+        }, 500);
+        timeouts.push(speechStartTimeout);
       };
 
       if (introEl) {

@@ -1,17 +1,5 @@
 
-import { VoiceId } from '../types.js';
-
-
-/**
- * Stem configuratie mapping naar ElevenLabs IDs
- */
-const VOICE_MAPPING: Record<VoiceId, string> = {
-  erik: '60CwgZt94Yf7yYIXMDDe',      // Heel rustig en veilig
-  samuel: 'DUhjXXCXHQWckglMUnOv',    // Fris en jong
-  rolf: 'lyMhRNSScIYS9YRQitfK',      // Radiocommercial stem
-  emma: 'yO6w2xlECAQRFP6pX7Hw',      // Warm en zakelijk
-  marjan: 'tfweP7lGJyLeNV9dH1Rm',    // Heldere vrouwenstem
-};
+import { VOICES, VoiceId } from '../types.js';
 
 const getSettingsForTone = (tone: string = "", gender: 'Male' | 'Female' = 'Male') => {
   const t = tone.toLowerCase();
@@ -40,8 +28,11 @@ export const generateSpeech = async (
   tone: string = "",
   authToken?: string | null
 ) => {
-  const elevenId = VOICE_MAPPING[voiceId];
-  const gender = (voiceId === 'emma' || voiceId === 'marjan') ? 'Female' : 'Male';
+  const voice = VOICES.find(candidate => candidate.id === voiceId);
+  if (!voice) throw new Error(`Unknown voice: ${voiceId}`);
+
+  const elevenId = voice.elevenLabsId;
+  const gender = voice.gender;
   
   const settings = getSettingsForTone(tone, gender);
 
@@ -60,20 +51,6 @@ export const generateSpeech = async (
     settings.similarity_boost = 0.90; // Meer karaktervastheid en volume-indruk
   }
   
-  // Tekst verrijking
-  let processedText = text;
-  
-  if (tone.toLowerCase().includes('luid')) {
-    processedText = processedText.replace(/\./g, '!');
-  }
-
-  if (gender === 'Female') {
-    processedText = processedText
-      .replace(/\. /g, '... ')
-      .replace(/\? /g, '?... ')
-      .replace(/! /g, '!... ');
-  }
-
   try {
     const response = await fetch('/api/tts', {
       method: 'POST',
@@ -82,9 +59,9 @@ export const generateSpeech = async (
         ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify({
-        text: processedText,
+        text,
         voiceId: elevenId,
-        modelId: 'eleven_multilingual_v2',
+        modelId: 'eleven_v4',
         voiceSettings: { ...settings, use_speaker_boost: true },
       }),
     });

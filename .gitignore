@@ -29,3 +29,5 @@ migrated_prompt_history/
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
