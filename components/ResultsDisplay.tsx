@@ -70,6 +70,7 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
   const [showFormattingTips, setShowFormattingTips] = useState<number | null>(null);
   
   const playerRef = useRef<SpotPlayer | null>(null);
+  const audioLoadsRef = useRef(new Map<string, Promise<SpotAssets>>());
 
   useEffect(() => {
     setEditedPassport(passport);
@@ -82,6 +83,65 @@ const ResultsDisplay: React.FC<Props> = ({ passport, scripts, inputData, onReset
     setLoadingIndices(new Set());
     setIsMailed(false);
   }, [passport, scripts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (scripts.length === 0) return;
+
+    setLoadingIndices(new Set(scripts.map((_, index) => index)));
+
+    const preloadAudio = async () => {
+      await Promise.all(scripts.map(async (script, index) => {
+        const voiceId = script.voiceId || inputData.voiceId || 'erik';
+        const requestKey = JSON.stringify([
+          script.content,
+          voiceId,
+          script.musicCategory,
+          inputData.duration,
+          passport.toneOfVoice,
+          authToken,
+        ]);
+        let request = audioLoadsRef.current.get(requestKey);
+
+        if (!request) {
+          request = produceRadioSpot(
+            script.content,
+            voiceId,
+            script.musicCategory,
+            inputData.duration,
+            passport.toneOfVoice,
+            authToken,
+          );
+          audioLoadsRef.current.set(requestKey, request);
+        }
+
+        try {
+          const assets = await request;
+          if (!cancelled) {
+            setAudioCache(previous => ({ ...previous, [index]: assets }));
+          }
+        } catch (error) {
+          console.error(`Audio preloading failed for option ${index + 1}`, error);
+        } finally {
+          if (audioLoadsRef.current.get(requestKey) === request) {
+            audioLoadsRef.current.delete(requestKey);
+          }
+          if (!cancelled) {
+            setLoadingIndices(previous => {
+              const next = new Set(previous);
+              next.delete(index);
+              return next;
+            });
+          }
+        }
+      }));
+    };
+
+    void preloadAudio();
+    return () => {
+      cancelled = true;
+    };
+  }, [scripts, passport, inputData.duration, inputData.voiceId, authToken]);
 
   const stopAudio = () => {
     if (playerRef.current) {
