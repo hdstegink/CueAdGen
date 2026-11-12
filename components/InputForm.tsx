@@ -75,21 +75,6 @@ const TEST_CASES: (UserInput & { id: string, label: string })[] = [
       accountManager: 'Hidde',
       toneOfVoice: 'Warm & Filmisch',
       objectives: 'Bioscoopbezoek verhogen nu de dagen korter en natter worden.'
-  },
-  {
-      id: 'lays-videoland',
-      label: "Lay's x Videoland",
-      url: 'www.lays.nl',
-      clientName: "Lay's x Videoland",
-      payoff: 'Maak elke aflevering lekkerder.',
-      usp: "Nog één aflevering? Dan hoort daar een zak Lay's bij. Koop deze maand twee zakken Lay's en maak kans op een maand Videoland.",
-      duration: Duration.TwentySeconds,
-      month: 'November',
-      industry: 'Food & Snacks',
-      targetAudience: 'Bingewatchers, stellen en vriendengroepen die op de bank series en films kijken.',
-      accountManager: 'Hidde',
-      toneOfVoice: 'Gezellig & Herkenbaar',
-      objectives: "Lay's koppelen aan het streamingmoment en actie-verkoop stimuleren met een Videoland-actie."
   }
 ];
 
