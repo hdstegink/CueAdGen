@@ -251,7 +251,7 @@ const AppContent: React.FC = () => {
                  Geschiedenis
                </button>
                <div className="hidden sm:block px-4 py-1.5 rounded-full bg-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                 BETA v1.2
+                 BETA v1.3
                </div>
             </div>
           </div>
